@@ -27,6 +27,8 @@ void debugf_(const char* func,const char* fileName,long line, const char*fmt,...
 #define HIGHLIGHT_HTML_IN_STRINGS 1
 
 
+
+
 static NSString* const	kMessageBuilderBBLMStringComment = @"se.redseven.bblm.MessageBuilder.stringComment";
 static NSString* const	kMessageBuilderBBLMStringProcDir = @"se.redseven.bblm.MessageBuilder.stringProcDir";
 static NSString* const	kMessageBuilderBBLMStringSubst = @"se.redseven.bblm.MessageBuilder.stringSubst";
