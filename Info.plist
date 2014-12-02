@@ -29,15 +29,28 @@
 			<true/>
 			<key>BBLMDroppedFilePathStyle</key>
 			<string>POSIX</string>
-			<key>BBLMEntryPointName</key>
-			<string>MessageBuilderMachO</string>
-			<key>BBLMFunctionScannerDoesFoldsToo</key>
-			<true/>
 			<key>BBLMIsCaseSensitive</key>
 			<false/>
+			<key>BBLMRunColors</key>
+			<dict>
+				<key>se.redseven.bblm.MessageBuilder.stringComment</key>
+				<string>==se.redseven.bblm.comment</string>
+				<key>se.redseven.bblm.MessageBuilder.stringProcDir</key>
+				<string>==se.redseven.bblm.string</string>
+				<key>se.redseven.bblm.MessageBuilder.stringSubst</key>
+				<string>==se.redseven.bblm.string</string>
+				<key>se.redseven.bblm.MessageBuilder.stringTag</key>
+				<string>==se.redseven.bblm.sgml-tag</string>
+				<key>se.redseven.bblm.MessageBuilder.stringTagAttr</key>
+				<string>==se.redseven.bblm.html.attribute-name</string>
+				<key>se.redseven.bblm.MessageBuilder.stringTagVal</key>
+				<string>==se.redseven.bblm.html.attribute-value</string>
+			</dict>
 			<key>BBLMKeywords</key>
 			<array>
 				<dict>
+					<key>RunKind</key>
+					<string>com.barebones.bblm.keyword</string>
 					<key>Keywords</key>
 					<array>
 						<string>add</string>
@@ -234,29 +247,14 @@
 						<string>write</string>
 						<string>xor</string>
 					</array>
-					<key>RunKind</key>
-					<string>com.barebones.bblm.keyword</string>
 				</dict>
 			</array>
 			<key>BBLMLanguageCode</key>
-			<string>XXPY</string>
+			<string>MeBu</string>
 			<key>BBLMLanguageDisplayName</key>
 			<string>MessageBuilder Language Module</string>
-			<key>BBLMRunColors</key>
-			<dict>
-				<key>se.redseven.bblm.MessageBuilder.stringComment</key>
-				<string>==se.redseven.bblm.comment</string>
-				<key>se.redseven.bblm.MessageBuilder.stringProcDir</key>
-				<string>==se.redseven.bblm.string</string>
-				<key>se.redseven.bblm.MessageBuilder.stringSubst</key>
-				<string>==se.redseven.bblm.string</string>
-				<key>se.redseven.bblm.MessageBuilder.stringTag</key>
-				<string>==se.redseven.bblm.sgml-tag</string>
-				<key>se.redseven.bblm.MessageBuilder.stringTagAttr</key>
-				<string>==se.redseven.bblm.html.attribute-name</string>
-				<key>se.redseven.bblm.MessageBuilder.stringTagVal</key>
-				<string>==se.redseven.bblm.html.attribute-value</string>
-			</dict>
+			<key>BBLMEntryPointName</key>
+			<string>MessageBuilderMachO</string>
 			<key>BBLMScansFunctions</key>
 			<true/>
 			<key>BBLMSuffixMap</key>
