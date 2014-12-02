@@ -1,0 +1,367 @@
+/*==============================================================================
+** MODULE       : procmbc_examples
+** FILE         : procmbc_examplemodifier.s4
+** COPYRIGHT    : (c) 2002 Axway Software
+** REVISION     : $Id: procmbc_examplemodifier.s4,v 1.10 2003/10/09 09:47:08 stge Exp $
+**============================================================================*/
+INCLUDE "mbci_hierchmsgenv.s4h" ONCE;
+INCLUDE "cfg_genericpropertystage.s4h" ONCE;
+INCLUDE "mbci_genericpropertystage.s4h" ONCE;
+INCLUDE "log_entry.s4h" ONCE;
+INCLUDE "log_genericevent.s4h" ONCE;
+INCLUDE "dataio.s4h" ONCE;
+INCLUDE "error.s4h" ONCE;
+
+/* force implementation of these module */
+DECLARE MODULE INTERFACE MBC_HIERCHMSGENV { } 
+DECLARE MODULE INTERFACE MBC_GENERICPROPERTYSTAGE { }
+
+DECLARE MODULE IMBC_COMMON
+{
+    /*()----------------------------------------------------------------------------
+    ** GetInfo
+    **----------------------------------------------------------------------------*/
+    DECLARE PUBLIC STATEMENT
+        GetInfo         OUT $Name
+            Revision    OUT $Revision
+            Description OUT $Description
+    {
+        $Name = "Modifier example";
+        $Revision = "2.0.2";
+        $Description = "The modifier example removes a character from the message.\n" &
+                       "Default character to remove is carrige returns <cr> or \\r." & 
+                       "\nCompile like this:\n" &
+                       "c4edi procmbc_examplemodifier.s4";
+        RETURN;
+    }
+}
+
+DECLARE MODULE IMBC_GENERICPROPERTYSTAGE
+{
+
+    /*()----------------------------------------------------------------------------
+    ** Initialize
+    ** - This statement is called once when the component is loaded for the first
+    **   time, and thereafter whenever the configuration for the component has
+    **   been modified.
+    **----------------------------------------------------------------------------*/
+    DECLARE PUBLIC STATEMENT
+    Initialize IN $Configuration PRIMITIVE
+    {
+        /* Always empty */
+        RETURN;
+    }
+
+    /*()----------------------------------------------------------------------------
+    ** GetKeywords()
+    ** - This function is called when the component is registered in the
+    **   component registry.
+    **----------------------------------------------------------------------------*/
+    DECLARE PUBLIC FUNCTION
+    GetKeywords() []
+    {
+        DECLARE $Keywords[] = {
+            "Remove character [\\r]",
+            "Debug (y/[n])"
+        } CONSTANT STRING;
+
+        RETURN $Keywords;
+    }
+
+    
+}
+
+DECLARE MODULE IMBC_HIERCHMSGENV
+{
+
+    DECLARE RECORD Configuration {
+        DECLARE FIELD $Remove         STRING;
+        DECLARE FIELD $Debug          INTEGER;
+    }
+    
+    /* Global variables */
+    DECLARE $False = 0          CONSTANT INTEGER;
+    DECLARE $True  = NOT $False CONSTANT INTEGER;
+
+
+    /*()----------------------------------------------------------------------------
+    ** Initialize
+    ** - This statement is called once when the component is loaded for the first
+    **   time, and thereafter whenever the configuration for the component has
+    **   been modified.
+    **----------------------------------------------------------------------------*/
+    DECLARE PUBLIC STATEMENT
+    Initialize IN $Configuration PRIMITIVE
+    {
+        /* Always empty */
+        RETURN;
+    }
+
+    /*()----------------------------------------------------------------------------
+    ** GetKeywords()
+    ** - This function is called when the component is registered in the
+    **   component registry.
+    **----------------------------------------------------------------------------*/
+    DECLARE PUBLIC FUNCTION
+    GetKeywords() []
+    {
+        DECLARE $Keywords[] = {
+            /*
+             *  These keywords must be included since the 
+             *  stage is an generic property stage of type modifier.
+             */
+             CFG_GENERICPROPERTYSTAGE.$SubclassName,
+            MBCI_HIERCHMSGENV.$Keyword_StageModifier
+        } CONSTANT STRING;
+
+        RETURN $Keywords;
+    }
+
+    /*()----------------------------------------------------------------------------
+    ** GetCharacteristics()
+    ** - This function is called when the component is loaded.
+    **----------------------------------------------------------------------------*/
+    DECLARE PUBLIC FUNCTION
+    GetCharacteristics($Qualifier PRIMITIVE) PRIMITIVE
+    {
+        DECLARE $ReturnValue INTEGER;
+
+        CASE $Qualifier
+        WHEN MBCI_HIERCHMSGENV.$GetCharacteristics_Qualifier_LoadSingleInstance {
+            /*
+             *  This MBC may be loaded in multiple instances
+             */
+            $ReturnValue = 0;
+        }
+        WHEN OTHERS {
+            $ReturnValue = 0;
+        }
+        RETURN $ReturnValue;
+    }
+
+    /*()----------------------------------------------------------------------------
+    ** Stop
+    **----------------------------------------------------------------------------*/
+    DECLARE PUBLIC STATEMENT
+    Stop
+    {
+        RETURN;
+    }
+
+    /*()----------------------------------------------------------------------------
+    ** ProcessMessage
+    ** - This statement is called for each message to process.
+    **----------------------------------------------------------------------------*/
+    DECLARE PUBLIC STATEMENT
+    ProcessMessage        IN $SessionId     PRIMITIVE
+        MessageId     IN $MessageId     PRIMITIVE
+        Configuration IN $ConfigurationString PRIMITIVE
+    {
+        DECLARE $StageConfiguration     RECORD MBCI_GENERICPROPERTYSTAGE.StageConfiguration;
+        DECLARE $Config                 RECORD Configuration;
+        DECLARE $DataIOHandle           RECORD DATAIO.Handle;
+        DECLARE $InputId                INTEGER;
+        DECLARE $buffer                 STRING;
+        DECLARE $NbrOfDeletedCharacters  = -1 INTEGER;
+        
+        /*
+         * Get stage configuration
+         */
+        TRY {
+            UNSERIALIZE $ConfigurationString INTO $StageConfiguration;
+        } CATCH $Exception
+        WHEN OTHERS {
+            LOG FORMAT("invalid stage configuration '%s'", $ConfigurationString);
+            
+            LogError         $SessionId
+                LoggerId   MBC_HIERCHMSGENV.GetLoggerId($SessionId, $MessageId)
+                ActivityId MBC_HIERCHMSGENV.GetActivityBranch($SessionId, $MessageId)
+                Description "Invalid stage configuration for modifier example";
+
+            MBC_HIERCHMSGENV.StopMessage $SessionId MessageId $MessageId;
+            MBC_HIERCHMSGENV.ProcessMessageDone $SessionId MessageId $MessageId;
+            RETURN;
+       }
+
+        /* 
+         * Set Config variables 
+         *
+         *      The (by GUI) configured values is stored in an array corresponding to the order of the keywords..
+         *      In this example:
+         *      [1] = "Remove character"
+         *      [2] = "Debug (Y/[N])"
+         */ 
+        IF ($StageConfiguration.$Tags[1].$Value = "\\r"){
+            $Config.$Remove = "\r";
+        }    
+        ELSE IF ($StageConfiguration.$Tags[1].$Value = "\\n"){
+            $Config.$Remove = "\n";
+        }    
+        ELSE IF ($StageConfiguration.$Tags[1].$Value = "\\t"){
+            $Config.$Remove = "\t";
+        }    
+        ELSE IF ($StageConfiguration.$Tags[1].$Value <> ""){
+            $Config.$Remove = $StageConfiguration.$Tags[1].$Value;
+        }    
+        ELSE { /* Default value */
+            $Config.$Remove = "\r";
+        }    
+        IF (SL_STRING.ToUpper($StageConfiguration.$Tags[2].$Value) = "Y"){
+            $Config.$Debug = $True;
+        }
+        
+        /*
+         * Create output dataio
+         */
+        DATAIO.CreateString $DataIOHandle;
+
+        /*
+         * Remove the character from the data
+         */
+        $InputId = MBC_HIERCHMSGENV.OpenInput($SessionId, $MessageId);
+        DATAIO.OpenOutput $DataIOHandle;            
+        $Error = 0; # Reset before usage
+        WHILE ($Error <> $Error_ReadEndOfFile) {
+            NOLOG {
+                READ $buffer UNTIL $Config.$Remove;
+            }
+            DATAIO.WriteOutput $DataIOHandle DATA $buffer;
+            $NbrOfDeletedCharacters = $NbrOfDeletedCharacters + 1;
+        }    
+        MBC_HIERCHMSGENV.CloseInput $InputId;
+        DATAIO.CloseOutput $DataIOHandle;
+
+        /*
+         * Attach the data to the message
+         */
+        MBC_HIERCHMSGENV.AttachData $SessionId
+            MessageId    $MessageId
+            Data         $DataIOHandle;
+
+        /*
+         * Log message
+         */
+        LogSuccess         $SessionId
+                LoggerId   MBC_HIERCHMSGENV.GetLoggerId($SessionId, $MessageId)
+                ActivityId MBC_HIERCHMSGENV.GetActivityBranch($SessionId, $MessageId)
+                Nbr        $NbrOfDeletedCharacters
+                Remove     $Config.$Remove;
+                
+        IF ($Config.$Debug = $True) {
+            TraceDebug "Modifier example processed file";
+        }    
+        
+        /*
+         * Done!
+         */
+        MBC_HIERCHMSGENV.ProcessMessageDone $SessionId MessageId $MessageId;
+
+        RETURN;
+    }
+    
+    /*()----------------------------------------------------------------------------
+    ** TraceDebug
+    **----------------------------------------------------------------------------*/
+    DECLARE STATEMENT TraceDebug IN $Str PRIMITIVE
+    {
+        LOG "[EXAMPLEMODIFIER] " & $Str TYPE "DEBUG";    
+        RETURN;
+    }    
+    
+    /*()----------------------------------------------------------------------------
+    ** LogSuccess
+    **----------------------------------------------------------------------------*/
+    DECLARE STATEMENT
+    LogSuccess      IN $SessionId  PRIMITIVE
+        LoggerId    IN $LoggerId   PRIMITIVE
+        ActivityId  IN $ActivityId PRIMITIVE
+        Nbr         IN $Nbr        PRIMITIVE
+        Remove      IN $Remove     PRIMITIVE
+    {
+        DECLARE $LogEvent    RECORD LOG_ENTRY.Event;
+        DECLARE $LogEventGeneric    RECORD LOG_GENERICEVENT.LogGenericEvent;
+            
+        /*
+         *  Create the logevent
+         */    
+        $LogEvent.$Description = "Modifier example processed message";
+        $LogEvent.$Code = 1;
+        $LogEvent.$Severity = LOG_ENTRY.$Event_SeverityInfo;
+        $LogEvent.$ActivityId = $ActivityId;
+        $LogEvent.$Date = CurrentDate();
+        
+        /*
+         *  Use generic logevent
+         */    
+        $LogEventGeneric.$Type =    "ModifierExample";
+
+        /* Non-searchable data elements */
+        $LogEventGeneric.$Data[1].$TagName = "Nbr removes";
+        $LogEventGeneric.$Data[1].$TagValue = $Nbr;
+
+        /* Searchable data elements */
+        $LogEventGeneric.$IndexData[1].$TagName = "Remove";
+        IF ($Remove = "\n"){
+            $LogEventGeneric.$IndexData[1].$TagValue = "\\n";
+        }
+        ELSE IF ($Remove = "\r"){
+            $LogEventGeneric.$IndexData[1].$TagValue = "\\r";
+        }
+        ELSE IF ($Remove = "\t"){
+            $LogEventGeneric.$IndexData[1].$TagValue = "\\t";
+        }
+        ELSE {
+            $LogEventGeneric.$IndexData[1].$TagValue = $Remove;
+        }
+        
+        LOG_GENERICEVENT.PackEvent $LogEventGeneric INTO $LogEvent;
+        
+        MBC_HIERCHMSGENV.CreateLoggerEvent $SessionId
+            LoggerId    $LoggerId
+            Event       $LogEvent;
+
+        RETURN;
+    }
+
+    /*()----------------------------------------------------------------------------
+    ** LogError
+    **----------------------------------------------------------------------------*/
+    DECLARE STATEMENT
+    LogError      IN $SessionId  PRIMITIVE
+        LoggerId    IN $LoggerId   PRIMITIVE
+        ActivityId  IN $ActivityId PRIMITIVE
+        ParentId    IN $ParentId = "" PRIMITIVE
+        Description IN $Description PRIMITIVE
+    {
+        DECLARE $LogEvent           RECORD LOG_ENTRY.Event;
+        DECLARE $LogEventGeneric    RECORD LOG_GENERICEVENT.LogGenericEvent;
+            
+        /*
+         *  Create the logevent
+         */    
+        $LogEvent.$Description = $Description;
+        $LogEvent.$Code = 1;
+        $LogEvent.$Severity = LOG_ENTRY.$Event_SeverityError;
+        $LogEvent.$ActivityId = $ActivityId;
+        IF ($ParentId <> "") {
+            $LogEvent.$ParentReferences[1] = $ParentId;
+        }
+        $LogEvent.$Date = CurrentDate();
+        
+        /*
+         *  Use generic logevent
+         */    
+        $LogEventGeneric.$Type =    "ModifierExample";
+
+        LOG_GENERICEVENT.PackEvent $LogEventGeneric INTO $LogEvent;
+        
+        MBC_HIERCHMSGENV.CreateLoggerEvent $SessionId
+            LoggerId    $LoggerId
+            Event       $LogEvent;
+
+        RETURN;
+    }
+
+
+}
+
