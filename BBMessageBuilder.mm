@@ -67,8 +67,6 @@ static UniChar start(struct runloc& r, BBLMTextIterator &p, BBLMParamBlock &pb, 
 
 static UniChar nextchar(struct runloc& r, BBLMTextIterator &p, BBLMParamBlock &pb, charbuf chars)
 {
-
-    
     if ( chars ) {
         
         for (int i=kBufsize-1; i > 0; i--) {
@@ -98,18 +96,19 @@ static UniChar nextchar(struct runloc& r, BBLMTextIterator &p, BBLMParamBlock &p
     return 0;
 }
 
-static bool addRun(NSString *kind, int  start,int len , const BBLMCallbackBlock& bblm_callbacks)
+static bool addRun(NSString *kind, int  start, int len, const BBLMCallbackBlock& bblm_callbacks)
 {
-    if (len > 0) {
+    if ( len > 0 ) {
         
         // Tie off the code run we were in, unless the length is zero.
         
         debugf("Run %@ %d:%d", kind, start, start+len-1 );
         
-        return bblmAddRun(	&bblm_callbacks, 'MeBu', kind, start, len, false);
+        return bblmAddRun(	&bblm_callbacks, 'MeBu', kind, start, len, false );
         
     }
-    else{
+    else {
+        
         return true;
     }
 }
@@ -119,8 +118,9 @@ static bool addRun(NSString *kind, int  start,int len , const BBLMCallbackBlock&
 
 static bool addRunAt (NSString *kind, struct runloc& r, const BBLMCallbackBlock& bblm_callbacks, int off=0)
 {
-    bool more_runs = addRun(kind, r.last_start, r.pos - r.last_start+1+off, bblm_callbacks);
-    r.last_start =  r.pos+1+off;
+    bool more_runs = addRun( kind, r.last_start, r.pos - r.last_start + 1 + off, bblm_callbacks );
+    r.last_start =  r.pos + 1 + off;
+    
     return more_runs;
 }
 
@@ -301,8 +301,7 @@ static bool colorstr( UniChar delim, BBLMParamBlock &pb, struct runloc &r, BBLMT
 
 static bool colorLineComment( BBLMParamBlock &pb, struct runloc &r, BBLMTextIterator &p, const BBLMCallbackBlock &bblm_callbacks )
 {
-    
-    while ( UniChar c = nextchar( r,p, pb,NULL ) ) {
+    while ( UniChar c = nextchar( r,p, pb, NULL ) ) {
         
         if ( c=='\r'|| c=='\n' ) {
             
@@ -316,19 +315,32 @@ static bool colorLineComment( BBLMParamBlock &pb, struct runloc &r, BBLMTextIter
 
 static bool colorBlockComment( BBLMParamBlock &pb, struct runloc &r, BBLMTextIterator &p, const BBLMCallbackBlock &bblm_callbacks )
 {
+    UniChar c = nextchar( r,p, pb, NULL );
     
-    while ( UniChar c = nextchar( r, p, pb, NULL ) ) {
+    while ( c ) {
         
         if ( c == '*' ) {
-            break;
+            
+            c = nextchar( r,p, pb, NULL );
+            if ( c == '/' ) {
+            
+                break;
+            }
         }
+        
+        c = nextchar( r,p, pb, NULL );
     }
     
     return addRunAt(kBBLMLineCommentRunKind,r,bblm_callbacks);
 }
 
 
-static bool colorvariable( BBLMParamBlock &pb, struct runloc &r, BBLMTextIterator &p, const BBLMCallbackBlock &bblm_callbacks )
+
+
+
+
+static bool colorVariable( BBLMParamBlock &pb, struct runloc &r, BBLMTextIterator &p,
+                          const BBLMCallbackBlock &bblm_callbacks )
 {
     
     while ( UniChar c = nextchar( r,p, pb,NULL ) ) {
@@ -340,7 +352,7 @@ static bool colorvariable( BBLMParamBlock &pb, struct runloc &r, BBLMTextIterato
 
     }
     
-    return addRunAt(kBBLMVariableRunKind,r,bblm_callbacks);
+    return addRunAt( kBBLMVariableRunKind, r, bblm_callbacks );
 }
 
 
@@ -361,15 +373,14 @@ static void CalculateRuns( BBLMParamBlock &pb, const BBLMCallbackBlock &bblm_cal
         //If we're in the basic 'code' state, check for each interesting char (rundelims[i].start).
         switch (c) {
             
-            // ", '
             case '\'':
             case '"' :
             {
-                more_runs = addRunAt(kBBLMCodeRunKind,r,bblm_callbacks,(chars[1]=='r'||chars[1]=='R'?-2:-1) );
+                more_runs = addRunAt(kBBLMCodeRunKind,r,bblm_callbacks, (chars[1] == 'r' || chars[1] == 'R' ? -2 : -1) );
                 
                 if ( more_runs ) {
                     
-                    more_runs = colorstr(c,pb,r,p,bblm_callbacks);
+                    more_runs = colorstr( c, pb, r, p, bblm_callbacks );
                 }
 
                 break;
@@ -382,7 +393,7 @@ static void CalculateRuns( BBLMParamBlock &pb, const BBLMCallbackBlock &bblm_cal
 
                 if ( more_runs ) {
                     
-                    more_runs = colorcomment(pb,r,p,bblm_callbacks);
+                    more_runs = colorLineComment( pb, r , p, bblm_callbacks );
                 }
                 
                 break;
@@ -397,7 +408,7 @@ static void CalculateRuns( BBLMParamBlock &pb, const BBLMCallbackBlock &bblm_cal
                     
                     if ( more_runs ) {
                         
-                        more_runs = colorcomment( pb, r, p, bblm_callbacks);
+                        more_runs = colorBlockComment( pb, r, p, bblm_callbacks);
                     }
                     
                     break;
@@ -407,13 +418,16 @@ static void CalculateRuns( BBLMParamBlock &pb, const BBLMCallbackBlock &bblm_cal
             // Variable
             case '$' :
             {
-                more_runs = addRunAt( kBBLMCodeRunKind, r, bblm_callbacks, -1 );
-                
-                if (more_runs)
+                char nc = nextchar( r, p, pb, chars );
+                if ( iswalnum( nc ) )
                 {
-                    more_runs = colorvariable( pb, r, p, bblm_callbacks);
-                }
+                    more_runs = addRunAt( kBBLMCodeRunKind, r, bblm_callbacks, -2 );
                 
+                    if (more_runs) {
+                        
+                        more_runs = colorVariable( pb, r, p, bblm_callbacks );
+                    }
+                }
                 break;
             }
                 
@@ -484,7 +498,7 @@ static void AdjustRange( BBLMParamBlock &params, const BBLMCallbackBlock &callba
 // The next couple funcs process the text of a file assumming it's in 1 piece in memory,
 // so they may not be called from CalculateRuns.
 
-static bool matchword( BBLMParamBlock &pb, const char *pat , UInt32 &pos )
+static bool matchwordCaseInsensitive( BBLMParamBlock &pb, const char *pat , UInt32 &pos )
 {
     BBLMTextIterator asciText(pb);
     
@@ -492,58 +506,25 @@ static bool matchword( BBLMParamBlock &pb, const char *pat , UInt32 &pos )
     
     for ( i=0; pat[i]; i++ ) {
         
-        if ( pos+i>=pb.fTextLength ) {
+        if ( towlower(pos + i) >= towlower(pb.fTextLength) ) {
             
             return false;
         }
 
-        if ( asciText[pos+i] != pat[i] ) {
+        if ( towlower(asciText[pos+i]) != towlower(pat[i]) ) {
             
             return false;
         }
     }
 
-    if ( ( pos + i < pb.fTextLength ) && iswordchar( asciText[pos+i] ) ) {
+    if ( ( towlower(pos + i) < towlower(pb.fTextLength) ) && iswordchar( towlower(asciText[pos+i]) ) ) {
         
         return false;
     }
 
-    pos+=i;
+    pos += i;
     
     return true;
-}
-
-static int matchindent( BBLMParamBlock &pb, UInt32 &pos )
-{
-    BBLMTextIterator	asciText(pb);
-    
-    int indent=0;
-    
-    while( pos<pb.fTextLength ) {
-        
-        switch (/*(char)(pb.fTextIsUnicode?uniText[pos]:*/asciText[pos]/*)*/)
-        {
-            case ' ':
-                ++pos;
-                indent++;
-                break;
-                
-            case '\t':
-                ++pos;
-                indent+=8;
-                break;
-                
-            case '#':
-                return -1;
-                break;
-                
-            default:
-                return indent;
-                break;
-        }
-    }
-
-    return indent;
 }
 
 
@@ -575,7 +556,7 @@ static void eat_line(BBLMParamBlock &pb, UInt32& pos)
             
             break;
         }
-        else if  (pos+6<pb.fTextLength &&
+        else if (pos+6<pb.fTextLength &&
                   ('\"' == asciText[pos]) &&
                   ('\"' == asciText[pos+1]) &&
                   ('\"' == asciText[pos+2]))
@@ -583,7 +564,7 @@ static void eat_line(BBLMParamBlock &pb, UInt32& pos)
             pos+=6;
             eat3str('"', pb, pos);
         }
-        else if  (pos+6<pb.fTextLength &&
+        else if (pos+6<pb.fTextLength &&
                   ('\'' == asciText[pos]) &&
                   ('\'' == asciText[pos+1]) &&
                   ('\'' == asciText[pos+2]))
@@ -611,10 +592,12 @@ static void addItem( BBLMProcInfo *procInfo, UInt32 pos, int nest, BBLMFunctionK
     UInt32 funcstart = pos - (kind == kBBLMFunctionMark ? 3/*strlen("def")*/ : 5/*strlen("class")*/);
 
     while ( funcstart>0 && isspace(asciText[funcstart-1]) && asciText[funcstart-1] != 0x0D ) {
+        
         funcstart--;
     }
     
     while (isspace(asciText[pos]) && pos<pb.fTextLength) {
+        
         ++pos;
     }
     
@@ -624,7 +607,7 @@ static void addItem( BBLMProcInfo *procInfo, UInt32 pos, int nest, BBLMFunctionK
         pos++; funcnamelen++;
     }
     
-    BBLMTextIterator	nameStart(asciText, fnamestart);
+    BBLMTextIterator nameStart(asciText, fnamestart);
     
     err = bblmAddTokenToBuffer(	bblm_callbacks, pb.fFcnParams.fTokenBuffer, nameStart.Address(),
                                funcnamelen, &offset);
@@ -671,6 +654,8 @@ static void commitfunc(BBLMProcInfo &proc, unsigned int funcEnd,
     int lastNonWSChar = 0;
     
 
+
+    
     // walk forwards to the end of the line (this may be several lines if they
     // were continued, so we have to look for the ":" function terminator
     while ( rangeStart < pb.fTextLength )
@@ -690,13 +675,18 @@ static void commitfunc(BBLMProcInfo &proc, unsigned int funcEnd,
         rangeStart++;
     }
     
+
+    
     // back up over any trailing whitespace on the
     while ( rangeStart > 0 && isspace(textIter[rangeStart-1] ) ) {
     
         rangeStart--;
     }
     
+
+    
     if (funcEnd > rangeStart) {
+        
         (void) bblmAddFoldRange(bblm_callbacks, rangeStart, funcEnd - rangeStart, (proc.fKind == kBBLMFunctionMark ? kBBLMFunctionAutoFold : kBBLMClassAutoFold));
     }
 }
@@ -709,20 +699,20 @@ enum {
 static void ScanForFunctions( BBLMParamBlock &pb, const BBLMCallbackBlock &bblm_callbacks )
 {
     //    BBLMProcInfo funcs[MAX_NEST];
-    BBLMProcInfo func;
+    //BBLMProcInfo func;
     UInt32 pos=0; // current character offset
     
     while ( pos < pb.fTextLength ){
         
-        // DECLARE PUBLIC STATEMENT
-        
-        // DECLARE PUBLIC FUNCTION
-        
-        if ( matchword( pb,"def", pos) ) {
+        if ( matchwordCaseInsensitive( pb, "STATEMENT", pos) ) {
             
             
         }
-        
+        else if ( matchwordCaseInsensitive( pb, "FUNCTION", pos) ) {
+            
+            
+        }
+
         
 //        int start_line = pos;
 //        int indent = matchindent(pb, pos);
